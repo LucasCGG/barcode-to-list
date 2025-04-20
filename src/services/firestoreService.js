@@ -71,17 +71,33 @@ export async function updateUserLastChecked(userId) {
  * Add an item to the shopping list
  * @param {string} item
  */
-
 export async function addItemToShoppingList(item) {
   try {
-    const docRef = db.collection('shoppingList').doc('current');
-    await docRef.set(
-      { items: admin.firestore.FieldValue.arrayUnion(item) },
-      { merge: true }
-    );
+    await db.runTransaction(async (transaction) => {
+      const docRef = db.collection('shoppingList').doc('current');
+      const doc = await transaction.get(docRef);
+      let data = doc.data();
+
+      if (!data) {
+        data = {
+          items: [],
+          last_updated: admin.firestore.FieldValue.serverTimestamp()
+        };
+      }
+
+      if (!data.items.includes(item)) {
+        data.items.push(item);
+        data.last_updated = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      transaction.set(docRef, data);
+    });
     console.log(`Item added to shopping list: ${item}`);
   } catch (error) {
-    console.error('Error adding item to list:', error);
+    console.error('Error adding item to list via transaction:', {
+      errorMessage: error.message,
+      item
+    });
     throw error;
   }
 }
