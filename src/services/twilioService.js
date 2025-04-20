@@ -2,8 +2,6 @@
 import twilio from 'twilio';
 import { 
   getShoppingList, 
-  getUserLastChecked, 
-  updateUserLastChecked,
   getPendingBarcode,
   addItemToShoppingList,
   saveCustomProduct,
@@ -67,19 +65,37 @@ export async function handleIncomingMessage(messageData) {
     }
   };
 
-  if (body.startsWith('lösche ')) {
-    const itemToDelete = rawBody.slice(7).trim();
+  if (body.startsWith('löschen ') || body.startsWith('lösche ') || body.startsWith('-')) {
+    const prefixLength = body.startsWith('löschen ') ? 8 : body.startsWith('lösche ') ? 7 : 1;
+    const itemToDelete = rawBody.slice(prefixLength).trim();
+    
     if (!itemToDelete) {
       await sendWhatsAppMessage(
         userId,
-        '❓ Welches Produkt möchtest du löschen? Beispiel: *lösche Milch*'
+        '❓ Welches Produkt möchtest du löschen? Beispiele:\n*• lösche Milch*\n*• löschen Käse*\n*• - Brot*'
       );
       return;
     }
+    
     await removeItemFromShoppingList(itemToDelete);
     await sendWhatsAppMessage(userId, `🗑️ "${itemToDelete}" wurde von der Einkaufsliste entfernt.`);
     return;
   }
+
+  if (body.startsWith('+')) {
+    const itemToAdd = rawBody.slice(1).trim();
+    if (!itemToAdd) {
+      await sendWhatsAppMessage(
+        userId,
+        '❓ Bitte gib einen Produktnamen nach dem + ein. Beispiel: *+ Milch*'
+      );
+      return;
+    }
+    await addItemToShoppingList(itemToAdd);
+    await sendWhatsAppMessage(userId, `✅ "${itemToAdd}" wurde zur Einkaufsliste hinzugefügt.`);
+    return;
+  }
+  
 
   if (commands[body]) {
     await commands[body]();
@@ -100,34 +116,20 @@ export async function handleIncomingMessage(messageData) {
 async function handleShoppingListRequest(userId) {
   try {
     const shoppingList = await getShoppingList();
-    const lastChecked = await getUserLastChecked(userId);
-    
     console.log(`Processing shopping list request for user: ${userId}`);
-    
 
-    const isFirstRequest = !lastChecked;
-    const isUpdated = !isFirstRequest && 
-                      shoppingList.last_updated && 
-                      lastChecked && 
-                      shoppingList.last_updated.toDate() > lastChecked.toDate();
+    const items = shoppingList.items.map((item, index) => `${index + 1}. ${item}`).join('\n');
+    const message = items.length > 0 
+      ? `*Einkaufsliste:*\n${items}`
+      : 'Die Einkaufsliste ist leer.';
     
-    if (isFirstRequest || isUpdated) {
-      const items = shoppingList.items.map((item, index) => `${index + 1}. ${item}`).join('\n');
-      const message = items.length > 0 
-        ? `*Einkaufsliste:*\n${items}`
-        : 'Die Einkaufsliste ist leer.';
-      
-      await sendWhatsAppMessage(userId, message);
-    } else {
-      await sendWhatsAppMessage(userId, 'Keine Änderungen seit deinem letzten Check');
-    }
-    
-    await updateUserLastChecked(userId);
+    await sendWhatsAppMessage(userId, message);
   } catch (error) {
     console.error('Error handling shopping list request:', {
       errorMessage: error.message,
       userId
     });
+    await sendWhatsAppMessage(userId, '⚠️ Es gab ein Problem beim Abrufen der Einkaufsliste');
     throw error;
   }
 }
