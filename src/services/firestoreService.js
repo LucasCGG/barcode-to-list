@@ -67,15 +67,19 @@ export async function updateUserLastChecked(userId) {
   }
 }
 
+/**
+ * Add an item to the shopping list
+ * @param {string} item
+ */
 
-export async function addItemToShoppingList(itemName) {
+export async function addItemToShoppingList(item) {
   try {
     const docRef = db.collection('shoppingList').doc('current');
-    await docRef.update({
-      items: admin.firestore.FieldValue.arrayUnion(itemName),
-      last_updated: admin.firestore.FieldValue.serverTimestamp()
-    });
-    console.log(`Item added to shopping list: ${itemName}`);
+    await docRef.set(
+      { items: admin.firestore.FieldValue.arrayUnion(item) },
+      { merge: true }
+    );
+    console.log(`Item added to shopping list: ${item}`);
   } catch (error) {
     console.error('Error adding item to list:', error);
     throw error;
@@ -157,6 +161,10 @@ export async function clearPendingBarcode(userId) {
   }
 }
 
+/**
+ * Remove an item from the shopping list
+ * @param {string} itemName
+ */
 export async function removeItemFromShoppingList(itemName) {
   try {
     const docRef = db.collection('shoppingList').doc('current');
@@ -171,7 +179,9 @@ export async function removeItemFromShoppingList(itemName) {
   }
 }
 
-
+/**
+ * Clear the shopping list
+ */
 export async function clearShoppingList() {
   try {
     const docRef = db.collection('shoppingList').doc('current');
