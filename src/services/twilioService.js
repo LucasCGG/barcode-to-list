@@ -67,7 +67,7 @@ export async function handleIncomingMessage(messageData) {
 
   if (body.startsWith('löschen ') || body.startsWith('lösche ') || body.startsWith('-')) {
     const prefixLength = body.startsWith('löschen ') ? 8 : body.startsWith('lösche ') ? 7 : 1;
-    const itemToDelete = rawBody.slice(prefixLength).trim();
+    const itemToDelete = rawBody.slice(prefixLength).trim().toLowerCase();
     
     if (!itemToDelete) {
       await sendWhatsAppMessage(
