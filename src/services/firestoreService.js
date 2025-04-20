@@ -67,17 +67,37 @@ export async function updateUserLastChecked(userId) {
   }
 }
 
-
-export async function addItemToShoppingList(itemName) {
+/**
+ * Add an item to the shopping list
+ * @param {string} item
+ */
+export async function addItemToShoppingList(item) {
   try {
-    const docRef = db.collection('shoppingList').doc('current');
-    await docRef.update({
-      items: admin.firestore.FieldValue.arrayUnion(itemName),
-      last_updated: admin.firestore.FieldValue.serverTimestamp()
+    await db.runTransaction(async (transaction) => {
+      const docRef = db.collection('shoppingList').doc('current');
+      const doc = await transaction.get(docRef);
+      let data = doc.data();
+
+      if (!data) {
+        data = {
+          items: [],
+          last_updated: admin.firestore.FieldValue.serverTimestamp()
+        };
+      }
+
+      if (!data.items.includes(item)) {
+        data.items.push(item);
+        data.last_updated = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      transaction.set(docRef, data);
     });
-    console.log(`Item added to shopping list: ${itemName}`);
+    console.log(`Item added to shopping list: ${item}`);
   } catch (error) {
-    console.error('Error adding item to list:', error);
+    console.error('Error adding item to list via transaction:', {
+      errorMessage: error.message,
+      item
+    });
     throw error;
   }
 }
@@ -157,6 +177,10 @@ export async function clearPendingBarcode(userId) {
   }
 }
 
+/**
+ * Remove an item from the shopping list
+ * @param {string} itemName
+ */
 export async function removeItemFromShoppingList(itemName) {
   try {
     const docRef = db.collection('shoppingList').doc('current');
@@ -171,7 +195,9 @@ export async function removeItemFromShoppingList(itemName) {
   }
 }
 
-
+/**
+ * Clear the shopping list
+ */
 export async function clearShoppingList() {
   try {
     const docRef = db.collection('shoppingList').doc('current');

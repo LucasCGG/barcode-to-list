@@ -32,8 +32,8 @@ export async function downloadAndProcessImage(mediaUrl, from) {
       responseType: 'stream',
       auth: {
         username: process.env.TWILIO_ACCOUNT_SID,
-        password: process.env.TWILIO_AUTH_TOKEN,
-      },
+        password: process.env.TWILIO_AUTH_TOKEN
+      }
     });
 
     const filename = `barcode_${Date.now()}.jpg`;
@@ -46,45 +46,58 @@ export async function downloadAndProcessImage(mediaUrl, from) {
       writer.on('error', reject);
     });
 
-    const stats = fs.statSync(tempPath);
+    const stats = await fs.promises.stat(tempPath);
     console.log(`📸 Downloaded image size: ${stats.size} bytes`);
 
     // Decode barcode
     const barcode = await decodeBarcodeFromImage(tempPath);
-
     if (!barcode) {
       console.log('🚫 No barcode found in image');
       await setPendingBarcode(from, barcode);
-      await sendWhatsAppMessage(from, `❓ I couldn’t detect a barcode. Want to add this product manually? Just reply with the name!`);
+      await sendWhatsAppMessage(
+        from,
+        '❓ Der Barcode konnte nicht erkannt werden. Versuche es erneut!'
+      );
       return;
     }
 
     console.log(`📦 Barcode detected: ${barcode}`);
 
-    // ✅ Check custom database first
     const customName = await getCustomProduct(barcode);
     if (customName) {
       await addItemToShoppingList(customName);
-      await sendWhatsAppMessage(from, `✅ Recognized barcode *${barcode}* as "${customName}" and added it to your list.`);
+      await sendWhatsAppMessage(
+        from,
+        `✅ Der Barcode *${barcode}* wurde als "${customName}" erkannt und der Einkaufsliste hinzugefügt.`
+      );
       return;
     }
 
-    // 🌐 Check UPC database if not locally known
     const product = await fetchProductInfo(barcode);
     if (product && product.title) {
       console.log(`✅ Product found via UPC: ${product.title}`);
       await addItemToShoppingList(product.title);
-      await sendWhatsAppMessage(from, `✅ Added "${product.title}" to your shopping list.`);
+      await sendWhatsAppMessage(
+        from,
+        `✅ "${product.title}" wurde der Einkaufsliste hinzugefügt.`
+      );
     } else {
-      // 🕵️‍♀️ Ask user to help if nothing was found
-      console.log('🔍 Product not found in UPC database');
+      console.log('🔍 Produkt nicht in UPC-Datenbank gefunden');
       await setPendingBarcode(from, barcode);
-      await sendWhatsAppMessage(from, `🤔 I found a barcode (${barcode}) but couldn’t find product info. Know what it is? Reply with the name and I’ll add it!`);
+      await sendWhatsAppMessage(
+        from,
+        `🤔 Ich habe einen Barcode (${barcode}) erkannt, konnte aber keine Produktinformationen finden. Weißt du was es ist? Antworte mit dem Namen und ich füge es der Einkaufsliste hinzu!`
+      );
     }
-
   } catch (error) {
-    console.error('❌ Image processing error:', error.message);
-    await sendWhatsAppMessage(from, `⚠️ Something went wrong processing your image. Please try again!`);
+    console.error('❌ Image processing error:', {
+      errorMessage: error.message,
+      mediaUrl
+    });
+    await sendWhatsAppMessage(
+      from,
+      '⚠️ Beim Verarbeiten deiner Bilddatei ist etwas schief gelaufen. Bitte versuche es erneut!'
+    );
   } finally {
     if (tempPath) {
       fs.unlink(tempPath, () => {});
@@ -101,12 +114,10 @@ export async function downloadAndProcessImage(mediaUrl, from) {
 async function fetchProductInfo(upc) {
   try {
     const response = await axios.get(UPC_ITEMDB_URL, {
-      params: { upc },
+      params: { upc }
     });
-
     const items = response.data.items;
     return items && items.length > 0 ? items[0] : null;
-
   } catch (err) {
     console.error('⚠️ Failed to fetch product info:', err.message);
     return null;
