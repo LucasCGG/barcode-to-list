@@ -140,7 +140,10 @@ export async function getCustomProduct(barcode) {
  */
 export async function setPendingBarcode(userId, barcode) {
   try {
-    await db.collection('pendingBarcodes').doc(userId).set({ barcode });
+    await db.collection('pendingBarcodes').doc(userId).set({ 
+      barcode,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
     console.log(`📌 Pending barcode (${barcode}) set for user ${userId}`);
   } catch (error) {
     console.error('Error setting pending barcode:', error);
@@ -156,7 +159,15 @@ export async function setPendingBarcode(userId, barcode) {
 export async function getPendingBarcode(userId) {
   try {
     const doc = await db.collection('pendingBarcodes').doc(userId).get();
-    return doc.exists ? doc.data().barcode : null;
+    if (!doc.exists) return null;
+    
+    const data = doc.data();
+    const FIVE_MINUTES = 5 * 60 * 1000; // 5 minute buffer
+    if (Date.now() - data.timestamp.toDate().getTime() > FIVE_MINUTES) {
+      await clearPendingBarcode(userId);
+      return null;
+    }
+    return data.barcode;
   } catch (error) {
     console.error('Error getting pending barcode:', error);
     throw error;
