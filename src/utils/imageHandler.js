@@ -19,6 +19,7 @@ if (!fs.existsSync(tempDir)) {
 }
 
 const UPC_ITEMDB_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
+const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product';
 
 /**
  * Download and process an image from a Twilio media URL
@@ -75,11 +76,12 @@ export async function downloadAndProcessImage(mediaUrl, from) {
 
     const product = await fetchProductInfo(barcode);
     if (product && product.title) {
-      console.log(`✅ Product found via UPC: ${product.title}`);
+      console.log(`✅ Product found via API: ${product.title}`);
+      const brandInfo = product.brand ? ` (${product.brand})` : '';
       await addItemToShoppingList(product.title);
       await sendWhatsAppMessage(
         from,
-        `✅ "${product.title}" wurde der Einkaufsliste hinzugefügt.`
+        `✅ "${product.title}${brandInfo}" wurde der Einkaufsliste hinzugefügt.`
       );
     } else {
       console.log('🔍 Produkt nicht in UPC-Datenbank gefunden');
@@ -113,13 +115,29 @@ export async function downloadAndProcessImage(mediaUrl, from) {
  */
 async function fetchProductInfo(upc) {
   try {
-    const response = await axios.get(UPC_ITEMDB_URL, {
-      params: { upc }
-    });
-    const items = response.data.items;
-    return items && items.length > 0 ? items[0] : null;
+    // Try UPCItemDB first
+    const upcResponse = await axios.get(UPC_ITEMDB_URL, { params: { upc } });
+    if (upcResponse.data.items?.length > 0) {
+      console.log(`Found product in UPCItemDB: ${upcResponse.data.items[0].title}`);
+      return upcResponse.data.items[0];
+    }
+
+    // Fallback to Open Food Facts
+    const offResponse = await axios.get(`${OPEN_FOOD_FACTS_URL}/${upc}.json`);
+    if (offResponse.data.status === 1 && offResponse.data.product.product_name) {
+      console.log(`Found product in Open Food Facts: ${offResponse.data.product.product_name}`);
+      return {
+        title: offResponse.data.product.product_name,
+        brand: offResponse.data.product.brands
+      };
+    }
+
+    return null;
   } catch (err) {
-    console.error('⚠️ Failed to fetch product info:', err.message);
+    console.error('Product lookup error:', {
+      upc,
+      error: err.message
+    });
     return null;
   }
 }
