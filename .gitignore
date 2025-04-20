@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.firebase/
+.firebaserc
+
+# Environment variables
+.env
+firebase-key.json
+
+# Temporary files
+temp/
+*.tmp
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+.next/
+out/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Local development
+.DS_Store
+Thumbs.db
+
+# Debug files
+*.pem
+*.pid
+
+# Testing
+coverage/
+.nyc_output/
+
+# Firebase credentials
+firebase-*.json
