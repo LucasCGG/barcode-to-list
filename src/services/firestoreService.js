@@ -163,6 +163,11 @@ export async function getPendingBarcode(userId) {
     
     const data = doc.data();
     const FIVE_MINUTES = 5 * 60 * 1000; // 5 minute buffer
+    if (!data.timestamp || typeof data.timestamp.toDate !== 'function') {
+      console.warn(`Invalid or missing timestamp for user ${userId}. Clearing pending barcode.`);
+      await clearPendingBarcode(userId);
+      return null;
+    }
     if (Date.now() - data.timestamp.toDate().getTime() > FIVE_MINUTES) {
       await clearPendingBarcode(userId);
       return null;
