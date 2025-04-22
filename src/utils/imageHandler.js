@@ -25,7 +25,7 @@ const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product';
  * Download and process an image from a Twilio media URL
  * @param {string} mediaUrl - Twilio-hosted image URL
  */
-export async function downloadAndProcessImage(mediaUrl, from) {
+export async function downloadAndProcessImage(mediaUrl, from, familyId) {
   let tempPath = null;
 
   try {
@@ -54,7 +54,7 @@ export async function downloadAndProcessImage(mediaUrl, from) {
     const barcode = await decodeBarcodeFromImage(tempPath);
     if (!barcode) {
       console.log('🚫 No barcode found in image');
-      await setPendingBarcode(from, barcode);
+      await setPendingBarcode(familyId, from, barcode);
       await sendWhatsAppMessage(
         from,
         '❓ Der Barcode konnte nicht erkannt werden. Versuche es erneut!'
@@ -64,9 +64,9 @@ export async function downloadAndProcessImage(mediaUrl, from) {
 
     console.log(`📦 Barcode detected: ${barcode}`);
 
-    const customName = await getCustomProduct(barcode);
+    const customName = await getCustomProduct(familyId, barcode);
     if (customName) {
-      await addItemToShoppingList(customName);
+      await addItemToShoppingList(familyId, customName);
       await sendWhatsAppMessage(
         from,
         `✅ Der Barcode *${barcode}* wurde als "${customName}" erkannt und der Einkaufsliste hinzugefügt.`
@@ -78,14 +78,14 @@ export async function downloadAndProcessImage(mediaUrl, from) {
     if (product && product.title) {
       console.log(`✅ Product found via API: ${product.title}`);
       const brandInfo = product.brand ? ` (${product.brand})` : '';
-      await addItemToShoppingList(product.title);
+      await addItemToShoppingList(familyId, product.title);
       await sendWhatsAppMessage(
         from,
         `✅ "${product.title}${brandInfo}" wurde der Einkaufsliste hinzugefügt.`
       );
     } else {
       console.log('🔍 Produkt nicht in UPC-Datenbank gefunden');
-      await setPendingBarcode(from, barcode);
+      await setPendingBarcode(familyId, from, barcode);
       await sendWhatsAppMessage(
         from,
         `🤔 Ich habe einen Barcode (${barcode}) erkannt, konnte aber keine Produktinformationen finden. Weißt du was es ist? Antworte mit dem Namen und ich füge es der Einkaufsliste hinzu!`

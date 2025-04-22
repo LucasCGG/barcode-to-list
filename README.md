@@ -6,13 +6,24 @@ A Node.js application that connects WhatsApp (via Twilio) to Firebase Firestore 
 
 - Receive and process WhatsApp messages via Twilio webhook
 - Store shopping lists in Firebase Firestore
-- Track when users last checked the shopping list
 - Handle image uploads and barcode processing
 - Custom barcode-to-product mappings
 - Pending barcode tracking for unrecognized products
 - ES6+ syntax with modular code structure
 - Item management commands (add/remove/clear)
 - Image processing with Sharp and ZXing libraries
+- Multi-family support with admin privileges
+- User management (invite, remove, promote/demote)
+- Profile name tracking for better user experience
+- `create Familyname` - Create a new family group
+- `beitreten ID` - Join an existing family using its ID
+- `id` - Show your family ID for sharing
+- `members` - List all family members
+- `einladen +NUMBER [Name]` - Invite a new member (admin only)
+- `entfernen NAME/NUMBER` - Remove a member (admin only)
+- `promote NAME/NUMBER` - Promote user to admin (admin only)
+- `demote NAME/NUMBER` - Remove admin privileges (admin only)
+- `verlassen` - Leave the current family
 
 ## Setup
 
@@ -55,6 +66,15 @@ A Node.js application that connects WhatsApp (via Twilio) to Firebase Firestore 
 - `löschen Item` - Remove specific item (e.g. "löschen Milk")
 - Send barcode image - Auto-add product if recognized
 - Send any other image - Process for potential barcode
+- `create Familyname` - Create a new family group
+- `beitreten ID` - Join an existing family using its ID
+- `id` - Show your family ID for sharing
+- `members` - List all family members
+- `einladen +NUMBER [Name]` - Invite a new member (admin only)
+- `entfernen NAME/NUMBER` - Remove a member (admin only)
+- `promote NAME/NUMBER` - Promote user to admin (admin only)
+- `demote NAME/NUMBER` - Remove admin privileges (admin only)
+- `verlassen` - Leave the current family
 
 ## Database Structure
 
@@ -64,10 +84,6 @@ A Node.js application that connects WhatsApp (via Twilio) to Firebase Firestore 
   - Document: `current`
     - `items`: Array of shopping list items
     - `last_updated`: Timestamp of last update
-
-- `userLastChecked`: Tracks when users last checked the list
-  - Document ID: User's WhatsApp number
-    - `timestamp`: Last check time
 
 - `customBarcodes`: Stores user-defined barcode mappings
   - Document ID: Barcode number

@@ -4,9 +4,11 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Read the Firebase service account key file
-const serviceAccount = JSON.parse(
-  readFileSync(join(process.cwd(), 'firebase-key.json'), 'utf8')
-);
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+};
 
 // Initialize Firebase with service account
 try {
