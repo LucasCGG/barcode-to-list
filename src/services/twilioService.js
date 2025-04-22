@@ -20,6 +20,7 @@ import {
   deleteFamily,
   demoteUserFromAdmin
 } from './familyService.js';
+import admin from 'firebase-admin';
 
 // Initialize Twilio client with specific credentials
 const twilioClient = twilio(
