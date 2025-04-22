@@ -101,8 +101,18 @@ export async function setPendingBarcode(familyId, userId, barcode) {
 export async function getPendingBarcode(familyId, userId) {
   const { pendingBarcodes } = collections(familyId);
   const snap = await pendingBarcodes.doc(userId).get();
+  
   if (!snap.exists) return null;
-  return snap.data().barcode;
+  
+  const data = snap.data();
+  const now = admin.firestore.Timestamp.now();
+  
+  if (data.expireAt && data.expireAt.toMillis() < now.toMillis()) {
+    await clearPendingBarcode(familyId, userId);
+    return null;
+  }
+  
+  return data.barcode;
 }
 
 /**
