@@ -25,7 +25,7 @@ const OPEN_FOOD_FACTS_URL = 'https://world.openfoodfacts.org/api/v2/product';
  * Download and process an image from a Twilio media URL
  * @param {string} mediaUrl - Twilio-hosted image URL
  */
-export async function downloadAndProcessImage(mediaUrl, from, familyId) {
+export async function downloadAndProcessImage(mediaUrl, from, familyId, t) {
   let tempPath = null;
 
   try {
@@ -57,19 +57,19 @@ export async function downloadAndProcessImage(mediaUrl, from, familyId) {
       await setPendingBarcode(familyId, from, barcode);
       await sendWhatsAppMessage(
         from,
-        '❓ Der Barcode konnte nicht erkannt werden. Versuche es erneut!'
+        t('barcode_not_recognized')
       );
       return;
     }
 
     console.log(`📦 Barcode detected: ${barcode}`);
 
-    const customName = await getCustomProduct(familyId, barcode);
-    if (customName) {
-      await addItemToShoppingList(familyId, customName);
+    const customProduct = await getCustomProduct(familyId, barcode);
+    if (customProduct) {
+      await addItemToShoppingList(familyId, customProduct);
       await sendWhatsAppMessage(
         from,
-        `✅ Der Barcode *${barcode}* wurde als "${customName}" erkannt und der Einkaufsliste hinzugefügt.`
+        t('custom_product_added', { product: customProduct })
       );
       return;
     }
@@ -81,14 +81,14 @@ export async function downloadAndProcessImage(mediaUrl, from, familyId) {
       await addItemToShoppingList(familyId, product.title);
       await sendWhatsAppMessage(
         from,
-        `✅ "${product.title}${brandInfo}" wurde der Einkaufsliste hinzugefügt.`
+        t('product_added', { product: product.title + brandInfo })
       );
     } else {
-      console.log('🔍 Produkt nicht in UPC-Datenbank gefunden');
+      console.log('🔍 Product not found in UPC database');
       await setPendingBarcode(familyId, from, barcode);
       await sendWhatsAppMessage(
         from,
-        `🤔 Ich habe einen Barcode (${barcode}) erkannt, konnte aber keine Produktinformationen finden. Weißt du was es ist? Antworte mit dem Namen und ich füge es der Einkaufsliste hinzu!`
+        t('barcode_recognized_no_product', { barcode })
       );
     }
   } catch (error) {
@@ -98,7 +98,7 @@ export async function downloadAndProcessImage(mediaUrl, from, familyId) {
     });
     await sendWhatsAppMessage(
       from,
-      '⚠️ Beim Verarbeiten deiner Bilddatei ist etwas schief gelaufen. Bitte versuche es erneut!'
+      t('image_processing_error')
     );
   } finally {
     if (tempPath) {
