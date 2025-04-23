@@ -328,7 +328,7 @@ async function handleRemoveItem(userId, body, rawBody, ctx, t) {
     if (partialMatches.length === 1) {
       const partialMatch = partialMatches[0];
       await removeItemFromShoppingList(ctx.familyId, partialMatch);
-      return { message: t('multiple_matches', { item: itemToDelete, matches: partialMatches.map(item => `• ${item}`).join('\n') }) };
+      return { message: t('item_removed_partial', { item: partialMatch }) };
     } else if (partialMatches.length > 1) {
       return { 
         message: t('multiple_matches', { item: itemToDelete, matches: partialMatches.map(item => `• ${item}`).join('\n') }) 
