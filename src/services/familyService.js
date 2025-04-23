@@ -25,10 +25,29 @@ export async function promoteUserToAdmin(familyId, phone) {
 }
 
 export async function removeUserFromFamily(familyId, phone) {
-  await db.collection('families').doc(familyId).update({
-    members: admin.firestore.FieldValue.arrayRemove(phone),
-    admins: admin.firestore.FieldValue.arrayRemove(phone),
-  });
+  const familyDoc = await getFamilyById(familyId);
+  if (!familyDoc) return;
+  
+  const members = familyDoc.members || [];
+  
+  if (members.includes(phone)) {
+    await db.collection('families').doc(familyId).update({
+      members: admin.firestore.FieldValue.arrayRemove(phone),
+      admins: admin.firestore.FieldValue.arrayRemove(phone),
+    });
+    return;
+  }
+  
+  const partialMatch = members.find(
+    member => member.toLowerCase().includes(phone.toLowerCase())
+  );
+  
+  if (partialMatch) {
+    await db.collection('families').doc(familyId).update({
+      members: admin.firestore.FieldValue.arrayRemove(partialMatch),
+      admins: admin.firestore.FieldValue.arrayRemove(partialMatch),
+    });
+  }
 }
 
 export async function findFamilyByUser(phone) {
