@@ -47,6 +47,21 @@
     "language_changed": "✅ Sprache wurde auf {{language}} geändert.",
     "available_languages": "Verfügbare Sprachen: de (Deutsch), en (English), pt (Portuguese)",
     "language_not_supported": "❌ Sprache nicht unterstützt. {{availableLanguages}}",
+    "product_added": "✅ \"{{product}}\" wurde zur Einkaufsliste hinzugefügt.",
+    "custom_product_added": "✅ \"{{product}}\" wurde zur Einkaufsliste hinzugefügt.",
+    "barcode_recognized_no_product": "🔍 Barcode {{barcode}} erkannt, aber Produkt nicht gefunden. Bitte gib den Produktnamen ein:",
+    "image_processing_error": "❌ Fehler bei der Bildverarbeitung. Bitte versuche es erneut.",
+    "barcode_not_recognized": "❌ Barcode nicht erkannt. Bitte versuche es mit einem klareren Bild erneut.",
+    "welcome": "Willkommen beim Einkaufslisten-Bot!",
+    "members_list": "Familienmitglieder:\n{{members}}",
+    "invitation_sent": "Einladung an {{name}} ({{number}}) gesendet.",
+    "language_set": "Sprache auf Deutsch gesetzt.",
+    "user_removed": "Benutzer '{{name}}' wurde aus der Familie entfernt.",
+    "user_promoted": "Benutzer '{{name}}' wurde zum Admin befördert.",
+    "user_demoted": "Benutzer '{{name}}' ist nicht mehr Admin.",
+    "pending_barcodes": "Ausstehende Barcodes:\n{{barcodes}}",
+    "no_pending_barcodes": "Es gibt keine ausstehenden Barcodes.",
+    "help": "Verfügbare Befehle:\n- create [Familienname]\n- beitreten [ID]\n- id\n- members\n- einladen +NUMMER [Name]\n- + [Artikel]\n- - [Artikel]\n- liste leeren\n- sprache [en/de/pt]",
     "commands": {
       "base": [
         "*einkaufsliste* Aktuelle Liste",
@@ -82,4 +97,4 @@
       "demote_member": ["demote"],
       "change_language": ["sprache"]
     }
-  }
+}
