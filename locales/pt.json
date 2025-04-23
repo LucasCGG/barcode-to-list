@@ -7,6 +7,7 @@
     "invitation_sent": "Convite enviado para {{name}} ({{number}}).",
     "item_added": "✅ \"{{item}}\" foi adicionado à sua lista de compras.",
     "item_removed": "🗑️ \"{{item}}\" foi removido da sua lista de compras.",
+    "item_removed_partial": "🗑️ Um item correspondente a \"{{item}}\" foi removido da lista de compras.",
     "list_cleared": "🧹 Sua lista de compras foi limpa.",
     "unknown_command": "Comando desconhecido. Comandos disponíveis:",
     "language_set": "Idioma definido para Português.",

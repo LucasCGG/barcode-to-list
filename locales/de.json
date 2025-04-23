@@ -11,6 +11,7 @@
     "item_added": "✅ \"{{item}}\" wurde zur Einkaufsliste hinzugefügt.",
     "delete_item_prompt": "❓ Welches Produkt möchtest du löschen? Beispiele:\n*• lösche Milch*\n*• löschen Käse*\n*• - Brot*",
     "item_removed": "🗑️ \"{{item}}\" wurde von der Einkaufsliste entfernt.",
+    "item_removed_partial": "🗑️ Ein Produkt, das zu \"{{item}}\" passt, wurde von der Einkaufsliste entfernt.",
     "multiple_matches": "❓ Mehrere Produkte passen zu \"{{item}}\". Bitte präzisiere:\n{{matches}}",
     "item_not_found": "❌ \"{{item}}\" wurde nicht in der Einkaufsliste gefunden.",
     "already_in_family": "⚠️ Du bist bereits in einer Familie!",
@@ -97,4 +98,4 @@
       "demote_member": ["demote"],
       "change_language": ["sprache"]
     }
-}
+  }

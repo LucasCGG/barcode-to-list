@@ -11,6 +11,7 @@
     "item_added": "✅ \"{{item}}\" has been added to the shopping list.",
     "delete_item_prompt": "❓ Which product would you like to delete? Examples:\n*• delete Milk*\n*• remove Cheese*\n*• - Bread*",
     "item_removed": "🗑️ \"{{item}}\" has been removed from the shopping list.",
+    "item_removed_partial": "🗑️ One item matching \"{{item}}\" has been removed from the shopping list.",
     "multiple_matches": "❓ Multiple products match \"{{item}}\". Please be more specific:\n{{matches}}",
     "item_not_found": "❌ \"{{item}}\" was not found in the shopping list.",
     "already_in_family": "⚠️ You are already in a family!",
