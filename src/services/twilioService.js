@@ -48,15 +48,12 @@ export async function handleIncomingMessage(messageData) {
   }
 
   try {
-    // Get user's family context
     const ctx = await getFamilyContext(userId);
     
-    // If we have a context and a profile name, update the memberNames
     if (ctx && profileName) {
       await updateMemberName(ctx.familyId, userId, profileName);
     }
     
-    // Handle media messages (images)
     if (numMedia > 0) {
       if (!ctx) {
         await sendWhatsAppMessage(userId, '⚠️ Du bist keiner Familie zugeordnet. Bitte erstelle oder trete einer Familie bei.');
@@ -73,7 +70,6 @@ export async function handleIncomingMessage(messageData) {
       return;
     }
     
-    // Handle pending barcode responses
     if (ctx) {
       const pendingBarcode = await getPendingBarcode(ctx.familyId, userId);
       if (pendingBarcode) {
@@ -81,12 +77,10 @@ export async function handleIncomingMessage(messageData) {
         return;
       }
     } else if (!isJoinCommand(body)) {
-      // If no context and not a create/join command, send join hint
       await sendJoinHint(userId);
       return;
     }
     
-    // Process commands by type
     let result = null;
     
     // Command type 1: Commands with special prefixes
@@ -129,13 +123,11 @@ export async function handleIncomingMessage(messageData) {
       result = await handleLeaveFamily(userId, ctx);
     }
     
-    // Send response if we have one
     if (result) {
       await sendWhatsAppMessage(userId, result.message);
       return;
     }
     
-    // If no command matched, show help
     await sendHelpMessage(userId, ctx);
     
   } catch (error) {
@@ -278,7 +270,7 @@ async function handleRemoveItem(userId, body, rawBody, ctx) {
   if (!ctx) return { message: await sendJoinHint(userId) };
   
   const prefixLength = body.startsWith('löschen ') ? 8 : body.startsWith('lösche ') ? 7 : 1;
-  const itemToDelete = rawBody.slice(prefixLength).trim().toLowerCase();
+  const itemToDelete = rawBody.slice(prefixLength).trim();
   
   if (!itemToDelete) {
     return { 
@@ -286,8 +278,33 @@ async function handleRemoveItem(userId, body, rawBody, ctx) {
     };
   }
   
-  await removeItemFromShoppingList(ctx.familyId, itemToDelete);
-  return { message: `🗑️ "${itemToDelete}" wurde von der Einkaufsliste entfernt.` };
+  const shoppingList = await getShoppingList(ctx.familyId);
+  
+  const exactItem = shoppingList.items.find(
+    item => item.toLowerCase() === itemToDelete.toLowerCase()
+  );
+  
+  if (exactItem) {
+    await removeItemFromShoppingList(ctx.familyId, exactItem);
+    return { message: `🗑️ "${exactItem}" wurde von der Einkaufsliste entfernt.` };
+  } else {
+    const partialMatches = shoppingList.items.filter(
+      item => item.toLowerCase().includes(itemToDelete.toLowerCase())
+    );
+    
+    if (partialMatches.length === 1) {
+      const partialMatch = partialMatches[0];
+      await removeItemFromShoppingList(ctx.familyId, partialMatch);
+      return { message: `🗑️ "${partialMatch}" wurde von der Einkaufsliste entfernt.` };
+    } else if (partialMatches.length > 1) {
+      return { 
+        message: `❓ Mehrere Produkte passen zu "${itemToDelete}". Bitte präzisiere:\n` +
+                 partialMatches.map(item => `• ${item}`).join('\n') 
+      };
+    }
+    
+    return { message: `❌ "${itemToDelete}" wurde nicht in der Einkaufsliste gefunden.` };
+  }
 }
 
 async function handleCreateFamily(userId, rawBody, ctx) {
@@ -333,31 +350,24 @@ async function handleInviteMember(userId, rawBody, ctx) {
     return { message: '❌ Bitte gib eine Telefonnummer an: *einladen +41794657076 [Name]*' };
   }
   
-  // For invite, we need a phone number
   const phonePart = parts[1];
   if (!phonePart || !phonePart.match(/^\+?\d/)) {
     return { message: '❌ Ungültige Nummer. Format: *einladen +41794657076 [Name]*' };
   }
   
-  // Optional name part
   const namePart = parts.length > 2 ? parts.slice(2).join(' ') : null;
-  
   const cleanNumber = cleanPhoneNumber(phonePart);
   
-  // Add user to family and store name if provided
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc) {
     return { message: '❌ Familie nicht gefunden.' };
   }
   
-  // Add to members array
   await db.collection('families').doc(ctx.familyId).update({
     members: admin.firestore.FieldValue.arrayUnion(cleanNumber)
   });
   
-  // If name is provided, store it in memberNames
   if (namePart) {
-    // Create or update the memberNames field
     const memberNamesUpdate = {};
     memberNamesUpdate[`memberNames.${cleanNumber}`] = namePart;
     
@@ -387,7 +397,6 @@ async function handleRemoveMember(userId, rawBody, ctx) {
     return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
   }
   
-  // Prevent removing yourself this way (use 'verlassen' instead)
   if (userPhone === userId) {
     return { message: '❌ Um die Familie zu verlassen, nutze den Befehl *verlassen*' };
   }
@@ -413,13 +422,11 @@ async function handlePromoteMember(userId, rawBody, ctx) {
     return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
   }
   
-  // Check if user is in the family
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc || !familyDoc.members.includes(userPhone)) {
     return { message: '❌ Diese Person gehört nicht zu deiner Familie.' };
   }
   
-  // Check if already admin
   if (familyDoc.admins.includes(userPhone)) {
     const userName = familyDoc.memberNames?.[userPhone] || userPhone;
     return { message: `⚠️ ${userName} ist bereits Admin.` };
@@ -446,24 +453,20 @@ async function handleDemoteMember(userId, rawBody, ctx) {
     return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
   }
   
-  // Check if user is in the family
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc || !familyDoc.members.includes(userPhone)) {
     return { message: '❌ Diese Person gehört nicht zu deiner Familie.' };
   }
   
-  // Check if already not an admin
   if (!familyDoc.admins.includes(userPhone)) {
     const userName = familyDoc.memberNames?.[userPhone] || userPhone;
     return { message: `⚠️ ${userName} ist kein Admin.` };
   }
   
-  // Prevent demoting yourself
   if (userPhone === userId) {
     return { message: '❌ Du kannst dich nicht selbst degradieren.' };
   }
   
-  // Prevent demoting the last admin
   if (familyDoc.admins.length <= 1) {
     return { message: '❌ Es muss mindestens ein Admin in der Familie bleiben.' };
   }
@@ -549,14 +552,12 @@ async function sendHelpMessage(userId, ctx) {
 async function findUserByNameOrPhone(familyId, nameOrPhone) {
   console.log(`Searching for member: "${nameOrPhone}" in family ${familyId}`);
   
-  // If it looks like a phone number, clean it and return
   if (nameOrPhone.includes('+') || /^\d{10,}$/.test(nameOrPhone)) {
     const cleanNumber = cleanPhoneNumber(nameOrPhone);
     console.log(`Identified as phone number: ${cleanNumber}`);
     return cleanNumber;
   }
   
-  // Otherwise, try to find by name
   const familyDoc = await getFamilyById(familyId);
   if (!familyDoc) {
     console.log('Family not found');
@@ -566,35 +567,27 @@ async function findUserByNameOrPhone(familyId, nameOrPhone) {
   console.log('Family members:', familyDoc.members);
   console.log('Member names:', familyDoc.memberNames);
   
-  // If we don't have memberNames, we need to initialize it
   if (!familyDoc.memberNames) {
     console.log('No memberNames found in family document, initializing it');
     
-    // Initialize memberNames with empty object
     await db.collection('families').doc(familyId).update({
       memberNames: {}
     });
     
-    // Try to match by phone number as fallback
     for (const phone of familyDoc.members || []) {
-      // Check if the phone number contains the search term
       if (phone.toLowerCase().includes(nameOrPhone.toLowerCase())) {
         console.log(`Found match in phone number: ${phone}`);
         return phone;
       }
     }
     
-    // If we have a ProfileName from Twilio, we could try to use that
-    // This would require storing the ProfileName when users join
-    
+   
     return null;
   }
   
-  // Search for the name (case insensitive)
   const searchName = nameOrPhone.toLowerCase();
   console.log(`Searching for name: "${searchName}"`);
   
-  // Try exact match first
   for (const [phone, name] of Object.entries(familyDoc.memberNames)) {
     if (name && name.toLowerCase() === searchName) {
       console.log(`Found exact name match: ${name} (${phone})`);
@@ -602,7 +595,6 @@ async function findUserByNameOrPhone(familyId, nameOrPhone) {
     }
   }
   
-  // Then try partial match
   for (const [phone, name] of Object.entries(familyDoc.memberNames)) {
     if (name && name.toLowerCase().includes(searchName)) {
       console.log(`Found partial name match: ${name} (${phone})`);
@@ -633,10 +625,8 @@ async function updateMemberName(familyId, userId, name) {
       
       const update = {};
       if (!familyDoc.memberNames) {
-        // Initialize memberNames if it doesn't exist
         update.memberNames = { [userId]: name };
       } else {
-        // Update just this user's name
         update[`memberNames.${userId}`] = name;
       }
       

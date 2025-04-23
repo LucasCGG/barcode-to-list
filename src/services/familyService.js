@@ -31,6 +31,7 @@ export async function removeUserFromFamily(familyId, phone) {
   });
 }
 
+
 export async function findFamilyByUser(phone) {
   const snapshot = await db.collection('families')
     .where('members', 'array-contains', phone)
