@@ -9,7 +9,7 @@ import {
   clearShoppingList
 } from './firestoreService.js';
 import { downloadAndProcessImage } from '../utils/imageHandler.js';
-import db  from '../config/firebase.js';
+import db from '../config/firebase.js';
 import { 
   addUserToFamily,
   getFamilyById,
@@ -20,7 +20,10 @@ import {
   deleteFamily,
   demoteUserFromAdmin
 } from './familyService.js';
+import { getTranslator } from './localization.js';
+import { getUserLanguage, setUserLanguage, isLanguageSupported, getSupportedLanguages } from './userLanguageService.js';
 import admin from 'firebase-admin';
+import { matchesCommand, extractCommandArgs } from '../utils/commandMatcher.js';
 
 // Initialize Twilio client with specific credentials
 const twilioClient = twilio(
@@ -48,15 +51,35 @@ export async function handleIncomingMessage(messageData) {
   }
 
   try {
+    // Get user's language preference
+    const userLanguage = await getUserLanguage(userId);
+    const t = await getTranslator(userLanguage);
+    
     const ctx = await getFamilyContext(userId);
     
     if (ctx && profileName) {
       await updateMemberName(ctx.familyId, userId, profileName);
     }
     
+    // Handle language change command
+    if (matchesCommand(body, t, 'change_language')) {
+      const langCode = extractCommandArgs(body, t, 'change_language').split(' ')[0]?.toLowerCase();
+      if (langCode) {
+        if (isLanguageSupported(langCode)) {
+          await setUserLanguage(userId, langCode);
+          await sendWhatsAppMessage(userId, t('language_changed', { language: langCode }));
+        } else {
+          await sendWhatsAppMessage(userId, t('language_not_supported', { 
+            availableLanguages: getSupportedLanguages() 
+          }));
+        }
+        return;
+      }
+    }
+    
     if (numMedia > 0) {
       if (!ctx) {
-        await sendWhatsAppMessage(userId, '⚠️ Du bist keiner Familie zugeordnet. Bitte erstelle oder trete einer Familie bei.');
+        await sendWhatsAppMessage(userId, t('not_in_family'));
         return;
       }
       
@@ -64,7 +87,7 @@ export async function handleIncomingMessage(messageData) {
         const mediaUrl = messageData['MediaUrl' + i];
         const contentType = messageData['MediaContentType' + i];
         if (contentType.startsWith('image/')) {
-          await handleImageMessage(userId, mediaUrl, contentType);
+          await handleImageMessage(userId, mediaUrl, contentType, t);
         }
       }
       return;
@@ -73,11 +96,11 @@ export async function handleIncomingMessage(messageData) {
     if (ctx) {
       const pendingBarcode = await getPendingBarcode(ctx.familyId, userId);
       if (pendingBarcode) {
-        await handlePendingBarcodeResponse(ctx.familyId, userId, rawBody, pendingBarcode);
+        await handlePendingBarcodeResponse(ctx.familyId, userId, rawBody, pendingBarcode, t);
         return;
       }
-    } else if (!isJoinCommand(body)) {
-      await sendJoinHint(userId);
+    } else if (!isJoinCommand(body, t)) {
+      await sendJoinHint(userId, t);
       return;
     }
     
@@ -85,42 +108,44 @@ export async function handleIncomingMessage(messageData) {
     
     // Command type 1: Commands with special prefixes
     if (body.startsWith('+')) {
-      result = await handleAddItem(userId, rawBody, ctx);
-    } else if (body.startsWith('löschen ') || body.startsWith('lösche ') || body.startsWith('-')) {
-      result = await handleRemoveItem(userId, body, rawBody, ctx);
+      result = await handleAddItem(userId, rawBody, ctx, t);
+    } else if (body.startsWith('löschen ') || body.startsWith('lösche ') || 
+               body.startsWith('delete ') || body.startsWith('remove ') || 
+               body.startsWith('-')) {
+      result = await handleRemoveItem(userId, body, rawBody, ctx, t);
     } 
-    // Command type 2: Commands that start with a keyword
-    else if (body.startsWith('create ')) {
-      result = await handleCreateFamily(userId, rawBody, ctx);
-    } else if (body.startsWith('beitreten ')) {
-      result = await handleJoinFamily(userId, rawBody);
-    } else if (body.startsWith('einladen ')) {
-      result = await handleInviteMember(userId, rawBody, ctx);
-    } else if (body.startsWith('entfernen ')) {
-      result = await handleRemoveMember(userId, rawBody, ctx);
-    } else if (body.startsWith('promote ')) {
-      result = await handlePromoteMember(userId, rawBody, ctx);
-    } else if (body.startsWith('demote ')) {
-      result = await handleDemoteMember(userId, rawBody, ctx);
+    // Command type 2: Commands that match translated keywords
+    else if (matchesCommand(body, t, 'create_family')) {
+      result = await handleCreateFamily(userId, rawBody, ctx, t);
+    } else if (matchesCommand(body, t, 'join_family')) {
+      result = await handleJoinFamily(userId, rawBody, t);
+    } else if (matchesCommand(body, t, 'invite_member')) {
+      result = await handleInviteMember(userId, rawBody, ctx, t);
+    } else if (matchesCommand(body, t, 'remove_member')) {
+      result = await handleRemoveMember(userId, rawBody, ctx, t);
+    } else if (matchesCommand(body, t, 'promote_member')) {
+      result = await handlePromoteMember(userId, rawBody, ctx, t);
+    } else if (matchesCommand(body, t, 'demote_member')) {
+      result = await handleDemoteMember(userId, rawBody, ctx, t);
     }
     // Command type 3: Exact match commands
-    else if (body === 'einkaufsliste') {
-      if (!ctx) return await sendJoinHint(userId);
-      await handleShoppingListRequest(ctx.familyId, userId);
+    else if (matchesCommand(body, t, 'shopping_list')) {
+      if (!ctx) return await sendJoinHint(userId, t);
+      await handleShoppingListRequest(ctx.familyId, userId, t);
       return;
-    } else if (body === 'liste leeren') {
-      if (!ctx) return await sendJoinHint(userId);
+    } else if (matchesCommand(body, t, 'clear_list')) {
+      if (!ctx) return await sendJoinHint(userId, t);
       await clearShoppingList(ctx.familyId);
-      result = { message: '🧹 Die Einkaufsliste wurde geleert.' };
-    } else if (body === 'members') {
-      result = await handleMembersCommand(userId, ctx);
-    } else if (body === 'id') {
-      if (!ctx) return await sendJoinHint(userId);
+      result = { message: t('list_cleared') };
+    } else if (matchesCommand(body, t, 'show_members')) {
+      result = await handleMembersCommand(userId, ctx, t);
+    } else if (matchesCommand(body, t, 'show_id')) {
+      if (!ctx) return await sendJoinHint(userId, t);
       result = { 
-        message: `🔑 Deine Familien-ID: ${ctx.familyId}\n\nTeile diesen Code zum Beitreten: *beitreten ${ctx.familyId}*` 
+        message: t('family_id', { id: ctx.familyId }) 
       };
-    } else if (body === 'verlassen') {
-      result = await handleLeaveFamily(userId, ctx);
+    } else if (matchesCommand(body, t, 'leave_family')) {
+      result = await handleLeaveFamily(userId, ctx, t);
     }
     
     if (result) {
@@ -128,11 +153,12 @@ export async function handleIncomingMessage(messageData) {
       return;
     }
     
-    await sendHelpMessage(userId, ctx);
+    await sendHelpMessage(userId, ctx, t);
     
   } catch (error) {
     console.error('Error handling message:', error);
-    await sendWhatsAppMessage(userId, '⚠️ Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.');
+    const t = await getTranslator(await getUserLanguage(userId));
+    await sendWhatsAppMessage(userId, t('error_occurred'));
   }
 }
 
@@ -142,16 +168,22 @@ export async function handleIncomingMessage(messageData) {
  * @param {string} userId - The WhatsApp user ID
  * @returns {Promise<void>}
  */
-async function handleShoppingListRequest(familyId, userId) {
+async function handleShoppingListRequest(familyId, userId, t) {
   try {
     const shoppingList = await getShoppingList(familyId);
     console.log(`Processing shopping list request for user: ${userId}`);
+    console.log('Translation function available:', !!t);
+    
+    // Log the translation key and result for debugging
+    const titleTranslation = t('shopping_list_title');
+    console.log(`Translation of 'shopping_list_title': '${titleTranslation}'`);
 
     const items = shoppingList.items.map((item, index) => `${index + 1}. ${item}`).join('\n');
     const message = items.length > 0 
-      ? `*Einkaufsliste:*\n${items}`
-      : 'Die Einkaufsliste ist leer.';
+      ? `${t('shopping_list_title')}\n${items}`
+      : t('shopping_list_empty');
     
+    console.log(`Final message: ${message.substring(0, 50)}...`);
     await sendWhatsAppMessage(userId, message);
   } catch (error) {
     console.error('Error handling shopping list request:', {
@@ -159,7 +191,7 @@ async function handleShoppingListRequest(familyId, userId) {
       familyId,
       userId
     });
-    await sendWhatsAppMessage(userId, '⚠️ Es gab ein Problem beim Abrufen der Einkaufsliste');
+    await sendWhatsAppMessage(userId, t('shopping_list_error'));
     throw error;
   }
 }
@@ -171,13 +203,13 @@ async function handleShoppingListRequest(familyId, userId) {
  * @param {string} contentType - The content type of the media
  * @returns {Promise<void>}
  */
-async function handleImageMessage(userId, mediaUrl, contentType) {
+async function handleImageMessage(userId, mediaUrl, contentType, t) {
   try {
     console.log(`Processing image from user: ${userId}`);
     
     const ctx = await getFamilyContext(userId);
     if (!ctx) {
-      await sendJoinHint(userId);
+      await sendJoinHint(userId, t);
       return;
     }
 
@@ -227,54 +259,55 @@ async function getFamilyContext(userId) {
   return { familyId: doc.id, isAdmin, familyData: doc.data() };
 }
 
-async function sendJoinHint(userId) {
+async function sendJoinHint(userId, t) {
   return sendWhatsAppMessage(
     userId,
-    '⚠️ Du bist keiner Familie zugeordnet. Erstelle mit *create NAME* eine oder trete mit *beitreten ID* bei.'
+    t('join_hint')
   );
 }
 
-async function handlePendingBarcodeResponse(familyId, userId, productName, barcode) {
+async function handlePendingBarcodeResponse(familyId, userId, productName, barcode, t) {
   try {
     await saveCustomProduct(familyId, barcode, productName);
     await addItemToShoppingList(familyId, productName);
     await clearPendingBarcode(familyId, userId);
     await sendWhatsAppMessage(
       userId,
-      `✅ "${productName}" wurde als Name für Barcode ${barcode} gespeichert und zur Liste hinzugefügt!`
+      t('product_saved', { productName, barcode })
     );
   } catch (error) {
     console.error('Error handling barcode response:', error);
-    await sendWhatsAppMessage(userId, '⚠️ Fehler beim Speichern des Produktnamens');
+    await sendWhatsAppMessage(userId, t('product_save_error'));
   }
 }
 
 // Helper functions
-function isJoinCommand(body) {
-  return body.startsWith('create ') || body.startsWith('beitreten ');
+function isJoinCommand(body, t) {
+  return matchesCommand(body, t, 'create_family') || 
+         matchesCommand(body, t, 'join_family');
 }
 
-async function handleAddItem(userId, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleAddItem(userId, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   
   const itemToAdd = rawBody.slice(1).trim();
   if (!itemToAdd) {
-    return { message: '❓ Bitte gib einen Produktnamen nach dem + ein. Beispiel: *+ Milch*' };
+    return { message: t('add_item_prompt') };
   }
   
   await addItemToShoppingList(ctx.familyId, itemToAdd);
-  return { message: `✅ "${itemToAdd}" wurde zur Einkaufsliste hinzugefügt.` };
+  return { message: t('item_added', { item: itemToAdd }) };
 }
 
-async function handleRemoveItem(userId, body, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleRemoveItem(userId, body, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   
-  const prefixLength = body.startsWith('löschen ') ? 8 : body.startsWith('lösche ') ? 7 : 1;
+  const prefixLength = body.startsWith('löschen ') ? 8 : body.startsWith('lösche ') ? 7 : body.startsWith('delete ') ? 6 : body.startsWith('remove ') ? 7 : 1;
   const itemToDelete = rawBody.slice(prefixLength).trim();
   
   if (!itemToDelete) {
     return { 
-      message: '❓ Welches Produkt möchtest du löschen? Beispiele:\n*• lösche Milch*\n*• löschen Käse*\n*• - Brot*' 
+      message: t('delete_item_prompt') 
     };
   }
   
@@ -286,7 +319,7 @@ async function handleRemoveItem(userId, body, rawBody, ctx) {
   
   if (exactItem) {
     await removeItemFromShoppingList(ctx.familyId, exactItem);
-    return { message: `🗑️ "${exactItem}" wurde von der Einkaufsliste entfernt.` };
+    return { message: t('item_removed', { item: exactItem }) };
   } else {
     const partialMatches = shoppingList.items.filter(
       item => item.toLowerCase().includes(itemToDelete.toLowerCase())
@@ -295,64 +328,71 @@ async function handleRemoveItem(userId, body, rawBody, ctx) {
     if (partialMatches.length === 1) {
       const partialMatch = partialMatches[0];
       await removeItemFromShoppingList(ctx.familyId, partialMatch);
-      return { message: `🗑️ "${partialMatch}" wurde von der Einkaufsliste entfernt.` };
+      return { message: t('multiple_matches', { item: itemToDelete, matches: partialMatches.map(item => `• ${item}`).join('\n') }) };
     } else if (partialMatches.length > 1) {
       return { 
-        message: `❓ Mehrere Produkte passen zu "${itemToDelete}". Bitte präzisiere:\n` +
-                 partialMatches.map(item => `• ${item}`).join('\n') 
+        message: t('multiple_matches', { item: itemToDelete, matches: partialMatches.map(item => `• ${item}`).join('\n') }) 
       };
     }
     
-    return { message: `❌ "${itemToDelete}" wurde nicht in der Einkaufsliste gefunden.` };
+    return { message: t('item_not_found', { item: itemToDelete }) };
   }
 }
 
-async function handleCreateFamily(userId, rawBody, ctx) {
+async function handleCreateFamily(userId, rawBody, ctx, t) {
   if (ctx) {
-    return { message: '⚠️ Du bist bereits in einer Familie!' };
+    return { message: t('already_in_family') };
   }
   
-  const familyName = rawBody.split(' ').slice(1).join(' ').trim();
+  const familyName = extractCommandArgs(rawBody.toLowerCase(), t, 'create_family').trim();
   if (!familyName) {
-    return { message: '❌ Bitte gib einen Namen an: *create Familienname*' };
+    return { message: t('create_family_prompt') };
   }
   
-  const newFamilyId = await createFamily({ name: familyName, creatorPhone: userId });
-  return { 
-    message: `✅ Familie "${familyName}" erstellt! ID: ${newFamilyId}\n\n` +
-             `Teile diese ID zum Beitreten: *beitreten ${newFamilyId}*` 
-  };
+  try {
+    const familyId = await createFamily({
+      name: familyName,
+      creatorPhone: userId
+    });
+    
+    return { 
+      message: t('family_created', { name: familyName, id: familyId })
+    };
+  } catch (error) {
+    console.error('Error creating family:', error);
+    return { message: t('error_occurred') };
+  }
 }
 
-async function handleJoinFamily(userId, rawBody) {
+async function handleJoinFamily(userId, rawBody, t) {
   const joinId = rawBody.split(' ')[1];
   if (!joinId) {
-    return { message: '❌ Bitte gib eine Familien-ID an: *beitreten FAMILIEN_ID*' };
+    return { message: t('join_family_prompt') };
   }
   
   const doc = await getFamilyById(joinId);
   if (!doc) {
-    return { message: '❌ Familie nicht gefunden. Überprüfe die ID.' };
+    return { message: t('family_not_found') };
   }
   
   await addUserToFamily(joinId, userId);
-  return { message: `✅ Du bist der Familie "${doc.name}" beigetreten!` };
+  return { message: t('joined_family', { name: doc.name }) };
 }
 
-async function handleInviteMember(userId, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleInviteMember(userId, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   if (!ctx.isAdmin) {
-    return { message: '⚠️ Nur Admins können Mitglieder einladen.' };
+    return { message: t('admin_only', { action: t('invite_member') }) };
   }
   
   const parts = rawBody.split(' ');
   if (parts.length < 2) {
-    return { message: '❌ Bitte gib eine Telefonnummer an: *einladen +41794657076 [Name]*' };
+    return { message: t('invite_format') };
   }
   
   const phonePart = parts[1];
   if (!phonePart || !phonePart.match(/^\+?\d/)) {
-    return { message: '❌ Ungültige Nummer. Format: *einladen +41794657076 [Name]*' };
+    return { message: t('invalid_number') };
   }
   
   const namePart = parts.length > 2 ? parts.slice(2).join(' ') : null;
@@ -360,7 +400,7 @@ async function handleInviteMember(userId, rawBody, ctx) {
   
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc) {
-    return { message: '❌ Familie nicht gefunden.' };
+    return { message: t('family_not_found') };
   }
   
   await db.collection('families').doc(ctx.familyId).update({
@@ -375,124 +415,124 @@ async function handleInviteMember(userId, rawBody, ctx) {
   }
   
   const message = namePart 
-    ? `✅ ${namePart} (${cleanNumber}) wurde erfolgreich eingeladen!`
-    : `✅ ${cleanNumber} wurde erfolgreich eingeladen!`;
+    ? t('member_invited', { name: namePart, phone: cleanNumber })
+    : t('phone_invited', { phone: cleanNumber });
     
   return { message };
 }
 
-async function handleRemoveMember(userId, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleRemoveMember(userId, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   if (!ctx.isAdmin) {
-    return { message: '⚠️ Nur Admins können Mitglieder entfernen.' };
+    return { message: t('admin_only', { action: t('remove_member') }) };
   }
   
   const namePart = rawBody.split(' ').slice(1).join(' ').trim();
   if (!namePart) {
-    return { message: '❌ Bitte gib einen Namen oder eine Nummer an: *entfernen Max* oder *entfernen +41794657076*' };
+    return { message: t('remove_member_prompt') };
   }
   
   const userPhone = await findUserByNameOrPhone(ctx.familyId, namePart);
   if (!userPhone) {
-    return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
+    return { message: t('member_not_found') };
   }
   
   if (userPhone === userId) {
-    return { message: '❌ Um die Familie zu verlassen, nutze den Befehl *verlassen*' };
+    return { message: t('use_leave_command') };
   }
   
   await removeUserFromFamily(ctx.familyId, userPhone);
   const userName = namePart.includes('+') ? userPhone : namePart;
-  return { message: `✅ ${userName} wurde aus der Familie entfernt.` };
+  return { message: t('member_removed', { name: userName }) };
 }
 
-async function handlePromoteMember(userId, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handlePromoteMember(userId, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   if (!ctx.isAdmin) {
-    return { message: '⚠️ Nur Admins können Mitglieder befördern.' };
+    return { message: t('admin_only', { action: t('promote_member') }) };
   }
   
   const namePart = rawBody.split(' ').slice(1).join(' ').trim();
   if (!namePart) {
-    return { message: '❌ Bitte gib einen Namen oder eine Nummer an: *promote Max* oder *promote +41794657076*' };
+    return { message: t('promote_member_prompt') };
   }
   
   const userPhone = await findUserByNameOrPhone(ctx.familyId, namePart);
   if (!userPhone) {
-    return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
+    return { message: t('member_not_found') };
   }
   
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc || !familyDoc.members.includes(userPhone)) {
-    return { message: '❌ Diese Person gehört nicht zu deiner Familie.' };
+    return { message: t('not_family_member') };
   }
   
   if (familyDoc.admins.includes(userPhone)) {
     const userName = familyDoc.memberNames?.[userPhone] || userPhone;
-    return { message: `⚠️ ${userName} ist bereits Admin.` };
+    return { message: t('already_admin', { name: userName }) };
   }
   
   await promoteUserToAdmin(ctx.familyId, userPhone);
   const userName = familyDoc.memberNames?.[userPhone] || userPhone;
-  return { message: `👑 ${userName} wurde zum Admin befördert.` };
+  return { message: t('promoted_to_admin', { name: userName }) };
 }
 
-async function handleDemoteMember(userId, rawBody, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleDemoteMember(userId, rawBody, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   if (!ctx.isAdmin) {
-    return { message: '⚠️ Nur Admins können Admin-Rechte entziehen.' };
+    return { message: t('admin_only', { action: t('demote_member') }) };
   }
   
   const namePart = rawBody.split(' ').slice(1).join(' ').trim();
   if (!namePart) {
-    return { message: '❌ Bitte gib einen Namen oder eine Nummer an: *demote Max* oder *demote +41794657076*' };
+    return { message: t('demote_member_prompt') };
   }
   
   const userPhone = await findUserByNameOrPhone(ctx.familyId, namePart);
   if (!userPhone) {
-    return { message: '❌ Kein Mitglied mit diesem Namen oder dieser Nummer gefunden.' };
+    return { message: t('member_not_found') };
   }
   
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc || !familyDoc.members.includes(userPhone)) {
-    return { message: '❌ Diese Person gehört nicht zu deiner Familie.' };
+    return { message: t('not_family_member') };
   }
   
   if (!familyDoc.admins.includes(userPhone)) {
     const userName = familyDoc.memberNames?.[userPhone] || userPhone;
-    return { message: `⚠️ ${userName} ist kein Admin.` };
+    return { message: t('not_admin', { name: userName }) };
   }
   
   if (userPhone === userId) {
-    return { message: '❌ Du kannst dich nicht selbst degradieren.' };
+    return { message: t('cannot_demote_self') };
   }
   
   if (familyDoc.admins.length <= 1) {
-    return { message: '❌ Es muss mindestens ein Admin in der Familie bleiben.' };
+    return { message: t('need_one_admin') };
   }
   
   await demoteUserFromAdmin(ctx.familyId, userPhone);
   const userName = familyDoc.memberNames?.[userPhone] || userPhone;
-  return { message: `👤 ${userName} ist nun kein Admin mehr.` };
+  return { message: t('demoted_from_admin', { name: userName }) };
 }
 
-async function handleMembersCommand(userId, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleMembersCommand(userId, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   
   const memberList = await listFamilyMembers(ctx.familyId);
   return { 
     message: memberList.length
-      ? `👥 Mitglieder deiner Familie:\n\n${memberList.join('\n')}`
-      : '🚫 Deine Familie hat momentan keine Mitglieder.'
+      ? t('family_members_title') + '\n\n' + memberList.join('\n')
+      : t('no_family_members')
   };
 }
 
-async function handleLeaveFamily(userId, ctx) {
-  if (!ctx) return { message: await sendJoinHint(userId) };
+async function handleLeaveFamily(userId, ctx, t) {
+  if (!ctx) return { message: await sendJoinHint(userId, t) };
   
   const familyDoc = await getFamilyById(ctx.familyId);
   if (!familyDoc) {
-    return { message: '❌ Familie nicht gefunden' };
+    return { message: t('family_not_found') };
   }
   
   const members = familyDoc.members || [];
@@ -500,7 +540,7 @@ async function handleLeaveFamily(userId, ctx) {
   if (ctx.isAdmin) {
     if (members.length === 1) {
       await deleteFamily(ctx.familyId);
-      return { message: '✅ Familie wurde gelöscht, da du das letzte Mitglied warst.' };
+      return { message: t('family_deleted') };
     } else {
       const otherMembers = members.filter(m => m !== userId);
       const newAdmin = otherMembers[0];
@@ -509,7 +549,7 @@ async function handleLeaveFamily(userId, ctx) {
   }
   
   await removeUserFromFamily(ctx.familyId, userId);
-  return { message: '✅ Du hast die Familie erfolgreich verlassen.' };
+  return { message: t('left_family') };
 }
 
 function cleanPhoneNumber(phone) {
@@ -519,29 +559,12 @@ function cleanPhoneNumber(phone) {
     .replace(/^(\d)/, '+$1');
 }
 
-async function sendHelpMessage(userId, ctx) {
-  const baseCommands = [
-    '*einkaufsliste* Aktuelle Liste',
-    '*id* Zeige Familien-ID',
-    '*members* Mitglieder anzeigen',
-    '*beitreten ID* Familie beitreten',
-    '*verlassen* Familie verlassen',
-    '*liste leeren* Liste löschen',
-    '*create Familienname* Familie erstellen',
-    '*+* Produkt hinzufügen',
-    '*-* Produkt löschen',
-    '*lösche* Produkt löschen'
-  ];
-
-  const adminCommands = ctx?.isAdmin ? [
-    '*einladen NUM* Mitglied einladen',
-    '*entfernen NAME/NUM* Mitglied entfernen',
-    '*promote NAME/NUM* Zum Admin befördern',
-    '*demote NAME/NUM* Admin-Rechte entziehen'
-  ] : [];
+async function sendHelpMessage(userId, ctx, t) {
+  const baseCommands = t('commands.base', { returnObjects: true });
+  const adminCommands = ctx?.isAdmin ? t('commands.admin', { returnObjects: true }) : [];
 
   const helpMessage = [
-    'Unbekannter Befehl. Verfügbare Befehle:',
+    t('unknown_command'),
     ...baseCommands,
     ...adminCommands
   ].join('\n    ');
@@ -636,4 +659,30 @@ async function updateMemberName(familyId, userId, name) {
     console.error('Error updating member name:', error);
   }
 }
+
+// Test translation function
+export async function testTranslations() {
+  const languages = ['de', 'en', 'fr'];
+  
+  for (const lang of languages) {
+    console.log(`Testing translations for language: ${lang}`);
+    const t = await getTranslator(lang);
+    
+    // Test a few key translations
+    const keys = [
+      'shopping_list_title',
+      'shopping_list_empty',
+      'item_added',
+      'unknown_command'
+    ];
+    
+    for (const key of keys) {
+      console.log(`  ${key}: "${t(key)}"`);
+    }
+    console.log('---');
+  }
+}
+
+// Call this function on startup
+testTranslations().catch(console.error);
 

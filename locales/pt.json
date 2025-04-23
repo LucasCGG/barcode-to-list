@@ -1,0 +1,25 @@
+{
+    "welcome": "Bem-vindo ao bot de lista de compras!",
+    "family_created": "Família '{{name}}' criada com sucesso.",
+    "joined_family": "Você entrou na família '{{name}}'.",
+    "family_id": "Sua ID de família é: {{id}}",
+    "members_list": "Membros da família:\n{{members}}",
+    "invitation_sent": "Convite enviado para {{name}} ({{number}}).",
+    "item_added": "Item '{{item}}' adicionado à sua lista de compras.",
+    "item_removed": "Item '{{item}}' removido da sua lista de compras.",
+    "list_cleared": "Sua lista de compras foi limpa.",
+    "unknown_command": "Desculpe, não entendi esse comando.",
+    "language_set": "Idioma definido para Português.",
+    "not_in_family": "Você não faz parte de nenhum grupo familiar. Por favor, junte-se a um ou crie um.",
+    "already_in_family": "Você já faz parte de um grupo familiar.",
+    "not_admin": "Você não tem privilégios de administrador para realizar esta ação.",
+    "user_removed": "Usuário '{{name}}' foi removido da família.",
+    "user_promoted": "Usuário '{{name}}' foi promovido a administrador.",
+    "user_demoted": "Usuário '{{name}}' foi rebaixado de administrador.",
+    "barcode_not_recognized": "Código de barras '{{code}}' não reconhecido. Por favor, forneça o nome do produto.",
+    "product_saved": "Produto '{{name}}' foi salvo para o código de barras '{{code}}'.",
+    "pending_barcodes": "Códigos de barras pendentes:\n{{barcodes}}",
+    "no_pending_barcodes": "Não há códigos de barras pendentes.",
+    "help": "Comandos disponíveis:\n- create [NomeDaFamília]\n- join [ID]\n- id\n- members\n- invite +NÚMERO [Nome]\n- add [Item]\n- remove [Item]\n- clear\n- language [en/de/pt]"
+  }
+  
