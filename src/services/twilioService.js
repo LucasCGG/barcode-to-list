@@ -288,13 +288,19 @@ async function handleRemoveItem(userId, body, rawBody, ctx) {
     await removeItemFromShoppingList(ctx.familyId, exactItem);
     return { message: `🗑️ "${exactItem}" wurde von der Einkaufsliste entfernt.` };
   } else {
-    const partialMatch = shoppingList.items.find(
+    const partialMatches = shoppingList.items.filter(
       item => item.toLowerCase().includes(itemToDelete.toLowerCase())
     );
     
-    if (partialMatch) {
+    if (partialMatches.length === 1) {
+      const partialMatch = partialMatches[0];
       await removeItemFromShoppingList(ctx.familyId, partialMatch);
       return { message: `🗑️ "${partialMatch}" wurde von der Einkaufsliste entfernt.` };
+    } else if (partialMatches.length > 1) {
+      return { 
+        message: `❓ Mehrere Produkte passen zu "${itemToDelete}". Bitte präzisiere:\n` +
+                 partialMatches.map(item => `• ${item}`).join('\n') 
+      };
     }
     
     return { message: `❌ "${itemToDelete}" wurde nicht in der Einkaufsliste gefunden.` };
