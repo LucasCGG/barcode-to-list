@@ -51,7 +51,6 @@ export async function handleIncomingMessage(messageData) {
   }
 
   try {
-    // Get user's language preference
     const userLanguage = await getUserLanguage(userId);
     const t = await getTranslator(userLanguage);
     
@@ -61,7 +60,6 @@ export async function handleIncomingMessage(messageData) {
       await updateMemberName(ctx.familyId, userId, profileName);
     }
     
-    // Handle language change command
     if (matchesCommand(body, t, 'change_language')) {
       const langCode = extractCommandArgs(body, t, 'change_language').split(' ')[0]?.toLowerCase();
       if (langCode) {
@@ -213,7 +211,7 @@ async function handleImageMessage(userId, mediaUrl, contentType, t) {
       return;
     }
 
-    await downloadAndProcessImage(mediaUrl, userId, ctx.familyId);
+    await downloadAndProcessImage(mediaUrl, userId, ctx.familyId, t);
     
     console.log(`Image processed successfully (no reply sent)`);
   } catch (error) {

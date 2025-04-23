@@ -11,6 +11,7 @@
     "item_added": "✅ \"{{item}}\" has been added to the shopping list.",
     "delete_item_prompt": "❓ Which product would you like to delete? Examples:\n*• delete Milk*\n*• remove Cheese*\n*• - Bread*",
     "item_removed": "🗑️ \"{{item}}\" has been removed from the shopping list.",
+    "item_removed_partial": "🗑️ One item matching \"{{item}}\" has been removed from the shopping list.",
     "multiple_matches": "❓ Multiple products match \"{{item}}\". Please be more specific:\n{{matches}}",
     "item_not_found": "❌ \"{{item}}\" was not found in the shopping list.",
     "already_in_family": "⚠️ You are already in a family!",
@@ -47,6 +48,21 @@
     "language_changed": "✅ Language has been changed to {{language}}.",
     "available_languages": "Available languages: de (German), en (English), pt (Portuguese)",
     "language_not_supported": "❌ Language not supported. {{availableLanguages}}",
+    "product_added": "✅ \"{{product}}\" has been added to the shopping list.",
+    "custom_product_added": "✅ \"{{product}}\" has been added to the shopping list.",
+    "barcode_recognized_no_product": "🔍 Barcode {{barcode}} recognized, but product not found. Please enter the product name:",
+    "image_processing_error": "❌ Error processing the image. Please try again.",
+    "barcode_not_recognized": "❌ Barcode not recognized. Please try again with a clearer image.",
+    "welcome": "Welcome to the shopping list bot!",
+    "members_list": "Family members:\n{{members}}",
+    "invitation_sent": "Invitation sent to {{name}} ({{number}}).",
+    "language_set": "Language set to English.",
+    "user_removed": "User '{{name}}' has been removed from the family.",
+    "user_promoted": "User '{{name}}' has been promoted to admin.",
+    "user_demoted": "User '{{name}}' has been demoted from admin.",
+    "pending_barcodes": "Pending barcodes:\n{{barcodes}}",
+    "no_pending_barcodes": "There are no pending barcodes.",
+    "help": "Available commands:\n- create [FamilyName]\n- join [ID]\n- id\n- members\n- invite +NUMBER [Name]\n- add [Item]\n- remove [Item]\n- clear\n- language [en/de/pt]",
     "commands": {
       "base": [
         "*shopping list* Current list",
@@ -82,4 +98,4 @@
       "demote_member": ["demote"],
       "change_language": ["language"]
     }
-  }
+}
