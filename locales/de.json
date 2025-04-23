@@ -45,7 +45,7 @@
     "list_cleared": "🧹 Die Einkaufsliste wurde geleert.",
     "unknown_command": "Unbekannter Befehl. Verfügbare Befehle:",
     "language_changed": "✅ Sprache wurde auf {{language}} geändert.",
-    "available_languages": "Verfügbare Sprachen: de (Deutsch), en (English), fr (Français)",
+    "available_languages": "Verfügbare Sprachen: de (Deutsch), en (English), pt (Portuguese)",
     "language_not_supported": "❌ Sprache nicht unterstützt. {{availableLanguages}}",
     "commands": {
       "base": [

@@ -45,7 +45,7 @@
     "list_cleared": "🧹 The shopping list has been cleared.",
     "unknown_command": "Unknown command. Available commands:",
     "language_changed": "✅ Language has been changed to {{language}}.",
-    "available_languages": "Available languages: de (German), en (English), fr (French)",
+    "available_languages": "Available languages: de (German), en (English), pt (Portuguese)",
     "language_not_supported": "❌ Language not supported. {{availableLanguages}}",
     "commands": {
       "base": [

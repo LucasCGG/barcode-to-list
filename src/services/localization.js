@@ -5,16 +5,16 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const localesPath = path.join(__dirname, '../../locales');
 
 /**
  * Initialize i18next with the specified language
  * @param {string} language - The language code to use
  * @returns {Promise<i18next.i18n>} - The initialized i18next instance
  */
-export async function initI18n(language = 'de') {
+export async function initI18n(language = 'en') {
   // Check if locale files exist and log their paths for debugging
   const localePath = path.join(process.cwd(), 'locales');
-  console.log(`Looking for locale files in: ${localePath}`);
   
   try {
     const files = fs.readdirSync(localePath);
@@ -23,14 +23,16 @@ export async function initI18n(language = 'de') {
     console.error(`Error reading locale directory: ${error.message}`);
   }
 
-  await i18next
+  const i18n = i18next.createInstance();
+  
+  await i18n
     .use(Backend)
     .init({
-      fallbackLng: 'de',
       lng: language,
-      debug: true, // Enable debug mode to see more logs
+      fallbackLng: 'en',
+      debug: true,
       backend: {
-        loadPath: path.join(process.cwd(), 'locales/{{lng}}.json')
+        loadPath: path.join(localesPath, '{{lng}}.json')
       },
       interpolation: {
         escapeValue: false
@@ -39,9 +41,9 @@ export async function initI18n(language = 'de') {
 
   // Log the loaded resources for debugging
   console.log(`i18next initialized with language: ${language}`);
-  console.log(`Available resources:`, Object.keys(i18next.services.resourceStore.data));
+  console.log(`Available resources:`, Object.keys(i18n.services.resourceStore.data));
   
-  return i18next;
+  return i18n;
 }
 
 /**
@@ -65,4 +67,27 @@ export async function getTranslator(language = 'de') {
   };
   
   return translator;
+}
+
+// Update the test translations function to include Portuguese
+export async function testTranslations() {
+  const languages = ['de', 'en', 'pt'];
+  
+  for (const lang of languages) {
+    console.log(`Testing translations for language: ${lang}`);
+    const t = await getTranslator(lang);
+    
+    // Test a few key translations
+    const keys = [
+      'shopping_list_title',
+      'shopping_list_empty',
+      'item_added',
+      'unknown_command'
+    ];
+    
+    for (const key of keys) {
+      console.log(`  ${key}: "${t(key)}"`);
+    }
+    console.log('---');
+  }
 }

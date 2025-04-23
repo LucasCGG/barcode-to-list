@@ -662,7 +662,7 @@ async function updateMemberName(familyId, userId, name) {
 
 // Test translation function
 export async function testTranslations() {
-  const languages = ['de', 'en', 'fr'];
+  const languages = ['de', 'en', 'pt'];
   
   for (const lang of languages) {
     console.log(`Testing translations for language: ${lang}`);

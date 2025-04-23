@@ -43,8 +43,7 @@ export async function setUserLanguage(userId, language) {
  * @returns {boolean} - Whether the language is supported
  */
 export function isLanguageSupported(language) {
-  const supportedLanguages = ['de', 'en', 'fr'];
-  return supportedLanguages.includes(language);
+  return ['de', 'en', 'pt'].includes(language.toLowerCase());
 }
 
 /**
@@ -52,5 +51,5 @@ export function isLanguageSupported(language) {
  * @returns {string} - A formatted string of supported languages
  */
 export function getSupportedLanguages() {
-  return 'de (Deutsch), en (English), fr (Français)';
+  return 'de (Deutsch), en (English), pt (Português)';
 } 
